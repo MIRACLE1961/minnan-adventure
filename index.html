@@ -223,12 +223,16 @@
 
   /* 答题 */
   .q-num{font-size:14px; font-weight:800; color:#6b5b6e; text-align:center; margin-bottom:2px;}
-  .q-prompt{background:rgba(255,255,255,.92); border:4px solid var(--ink); border-radius:26px; padding:22px 18px; text-align:center;
+  .q-prompt{position:relative; background:rgba(255,255,255,.92); border:4px solid var(--ink); border-radius:26px; padding:22px 18px; text-align:center;
     box-shadow:var(--shadow); margin:10px 0 18px;}
   .q-prompt .q-emoji{font-size:82px; line-height:1;}
   .q-prompt .q-word{font-family:"ZCOOL KuaiLe",sans-serif; font-size:50px; letter-spacing:3px; line-height:1.2;}
   .q-prompt .q-pin{font-family:"Baloo 2",sans-serif; font-size:26px; font-weight:800; color:#ff7a4d; margin-top:4px;}
+  .q-prompt .q-romaji{font-family:"Baloo 2",sans-serif; font-size:42px; font-weight:800; color:#ff7a4d; letter-spacing:1px; line-height:1.2; padding-right:40px;}
   .q-prompt .q-sub{font-size:15.5px; font-weight:700; color:#6b5b6e; margin-top:6px;}
+  .q-speaker{position:absolute; top:10px; right:10px; border:2.5px solid var(--ink); border-radius:999px; padding:6px 11px;
+    font-family:inherit; font-size:13px; font-weight:800; background:#5cb8e4; color:#fff; cursor:pointer; box-shadow:var(--shadow-sm);}
+  .q-speaker:active{transform:scale(.92);}
   .opts{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
   .opt{border:3px solid var(--ink); border-radius:20px; background:rgba(255,255,255,.92); padding:18px 8px; font-weight:800;
     font-size:21px; cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .08s, background .12s; min-height:66px;
@@ -758,13 +762,12 @@ function speak(text, lang, rate, pitch){
     window.speechSynthesis.speak(u);
   }catch(e){}
 }
-function speakMin(){
-  var w = curWord(); if(!w) return;
-  var base = "audio/min/" + (curLv+1) + "-" + (learnIdx+1);
+function playMin(levelIdx, wordIdx, fallbackText){
+  var base = "audio/min/" + (levelIdx+1) + "-" + (wordIdx+1);
   var exts = [".mp3", ".m4a", ".ogg", ".wav"];
   tryMin(0);
   function tryMin(i){
-    if(i >= exts.length){ fallbackMinSpeak(); return; }
+    if(i >= exts.length){ if(fallbackText) speak(fallbackText, "en-US", 0.78, 1.1); return; }
     var a = new Audio();
     var done = false;
     var fail = function(){ if(!done){ done = true; tryMin(i+1); } };
@@ -773,9 +776,8 @@ function speakMin(){
     try{ var p = a.play(); if(p && p.catch){ p.catch(fail); } }catch(e){ fail(); }
   }
 }
-function fallbackMinSpeak(){
-  var w = curWord(); if(w) speak(w.p, "en-US", 0.78, 1.1);
-}
+function speakMin(){ var w = curWord(); if(w) playMin(curLv, learnIdx, w.p); }
+function speakQuizWord(){ var q = qs[qi]; if(q) playMin(curLv, q.idx, q.word.p); }
 function speakMan(){ var w = curWord(); if(w) speak(w.m, "zh-CN", 0.85, 1.15); }
 function curWord(){ return LEVELS[curLv].words[learnIdx]; }
 
@@ -908,27 +910,31 @@ function startQuiz(){
   show("quiz");
 }
 function buildQuestions(words){
-  var types = ["emoji","hanzi","pinyin"];
-  var out = words.map(function(w){
-    var type = types[Math.floor(Math.random()*types.length)];
+  var out = words.map(function(w, wi){
+    var type = ["read","recall","listen"][Math.floor(Math.random()*3)];
     var others = words.filter(function(x){ return x!==w; });
-    var opts, prompt;
-    if(type === "emoji"){
-      prompt = '<div class="q-emoji">'+w.e+'</div><div class="q-sub">这个图，闽南话是哪个？</div>';
+    var opts, prompt, cls;
+    if(type === "read"){          // 看台罗 → 选汉字（认读音）
+      prompt = '<div class="q-romaji">'+w.p+'</div><div class="q-sub">这个读音，是哪个词？</div>';
       opts = [w.h].concat(pick(others,3).map(function(o){return o.h;}));
-    } else if(type === "hanzi"){
-      prompt = '<div class="q-word">'+w.h+'</div><div class="q-pin">'+w.p+'</div><div class="q-sub">选出对的图</div>';
-      opts = [w.e].concat(pick(others,3).map(function(o){return o.e;}));
-    } else {
-      prompt = '<div class="q-word">'+w.h+'</div><div class="q-emoji">'+w.e+'</div><div class="q-sub">选出对的拼音</div>';
+      cls = "hanzi-opt";
+    } else if(type === "recall"){ // 看汉字+图 → 选台罗（回忆读音）
+      prompt = '<div class="q-word">'+w.h+'</div><div class="q-emoji">'+w.e+'</div><div class="q-sub">选出对的台罗拼音</div>';
       opts = [w.p].concat(pick(others,3).map(function(o){return o.p;}));
+      cls = "pinyin-opt";
+    } else {                       // 看台罗 → 选图（认读音，低龄友好）
+      prompt = '<div class="q-romaji">'+w.p+'</div><div class="q-sub">这个读音，选对的图</div>';
+      opts = [w.e].concat(pick(others,3).map(function(o){return o.e;}));
+      cls = "emoji-opt";
     }
     var order = shuffle([0,1,2,3]);
     return {
       prompt: prompt,
       options: order.map(function(i){ return opts[i]; }),
       correct: order.indexOf(0),
-      cls: type==="hanzi" ? "emoji-opt" : (type==="emoji" ? "hanzi-opt" : "pinyin-opt")
+      cls: cls,
+      word: w,
+      idx: wi
     };
   });
   return shuffle(out).slice(0, Math.min(words.length, 8));
@@ -936,7 +942,7 @@ function buildQuestions(words){
 function renderQuestion(){
   var q = qs[qi];
   $("qNum").textContent = "第 "+(qi+1)+" / "+qs.length+" 题";
-  $("qPrompt").innerHTML = q.prompt;
+  $("qPrompt").innerHTML = '<button class="q-speaker" onclick="speakQuizWord()">🔊 听发音</button>' + q.prompt;
   var html = "";
   q.options.forEach(function(o,i){
     html += '<button class="opt '+q.cls+'" onclick="answer('+i+')">'+o+'</button>';
