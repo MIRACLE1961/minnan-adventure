@@ -6,7 +6,7 @@
 <title>闽南语冒险岛 · 海边学闽南话</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=ZCOOL+KuaiLe&display=swap" media="print" onload="this.media='all'">
 <style>
   :root{
     --ink:#3b2d3e;
@@ -749,7 +749,6 @@ function pickVoice(lang){
 function speak(text, lang, rate, pitch){
   if(!("speechSynthesis" in window)) return;
   try{
-    window.speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance(text);
     u.lang = lang || "zh-CN";
     u.rate = rate || 0.85;
